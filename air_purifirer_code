@@ -1,0 +1,156 @@
+#include <LiquidCrystal.h>
+#include <DHT.h>
+#include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BMP280.h>
+
+#define SEALEVELPRESSURE_HPA (1013.25)
+
+
+Adafruit_BMP280 bme;
+
+
+#define DHTPIN 8
+#define DHTTYPE DHT11
+
+DHT dht(DHTPIN, DHTTYPE);
+
+int relayPin2 = 9;
+int RelayPin = 13;
+int Contrast=100;
+
+LiquidCrystal lcd(12, 11, 5, 4, 3, 2);  
+
+int measurePin = A1;
+int ledPower = 7;
+
+unsigned int samplingTime = 280;
+unsigned int deltaTime = 40;
+unsigned int sleepTime = 9680;
+
+float voMeasured = 0;
+float calcVoltage = 0;
+float dustDensity = 0;
+
+
+
+ void setup()
+ {
+    Serial.begin(9600);
+    
+  pinMode(ledPower,OUTPUT);
+  
+  if (!bme.begin(0x76)) {
+    Serial.println("Could not find a valid BME280 sensor, check wiring!");
+    while (1);
+  }
+     analogWrite(6,Contrast);
+     lcd.begin(16, 2);
+     pinMode(A0,INPUT);
+     pinMode(A1,INPUT);
+     dht.begin(); // initialize the sensor
+     pinMode(RelayPin, OUTPUT);
+     pinMode(relayPin2, OUTPUT);
+  } 
+
+  
+     void loop()
+ { 
+    
+    // humidity
+    int humi  = dht.readHumidity();
+    
+    // temperature as Celsius
+    int tempC = dht.readTemperature();
+    
+    // read temperature as Fahrenheit
+    //float tempF = dht.readTemperature(true);
+
+
+    //altitude
+    int alt =bme.readAltitude(SEALEVELPRESSURE_HPA);
+
+    //air pressure
+    int pre = bme.readPressure() / 100.0F;
+
+
+     //air quality
+     int a = analogRead(A0); // AQ
+
+
+    //dust sensor
+     digitalWrite(ledPower,LOW);
+  delayMicroseconds(samplingTime);
+
+  voMeasured = analogRead(measurePin);
+
+  delayMicroseconds(deltaTime);
+  digitalWrite(ledPower,HIGH);
+  delayMicroseconds(sleepTime);
+
+  calcVoltage = voMeasured*(5.0/1024);
+  dustDensity = 0.17*calcVoltage-0.1;
+
+  if ( dustDensity < 0)
+  {
+    dustDensity = 0.00;
+  }
+
+
+//**************************
+
+    lcd.setCursor(0, 0);
+  lcd.print("temperature : ");      // temperature in celcius
+  lcd.print(tempC);
+  lcd.setCursor(0, 1);
+  lcd.print("humidity : ");         //humidity
+  lcd.print(humi);
+  delay(3000);
+
+  lcd.clear();
+  delay(1000);
+
+  lcd.setCursor(0, 0);
+  lcd.print("altitude : ");           // altitude in meters
+  lcd.print(alt);
+  lcd.setCursor(0, 1);
+  lcd.print("pressure : ");           // air presure in hPa
+  lcd.print(pre);
+  delay(3000);
+
+  lcd.clear();
+  delay(1000);
+
+  lcd.setCursor(0, 0);
+  lcd.print("RSV:");                  // raw signal value
+  lcd.print(voMeasured);
+  lcd.setCursor(0, 1);
+  lcd.print("DD:");                   //Dust Density is measured in units of mass / volume mg/m3.
+  lcd.print(dustDensity);
+  delay(3000);
+
+  lcd.clear();
+  delay(1000);
+
+  lcd.setCursor(0, 0);
+  lcd.print("Air quality:");           // air quality value
+  lcd.print(a);
+  delay(3000);
+
+  lcd.clear();
+  delay(1000);
+
+  //******************************
+
+    //motor activation and buzzer activation
+     
+     if (a >= 350 || voMeasured >= 300) {
+        digitalWrite(RelayPin, LOW); //motor activate
+        digitalWrite(relayPin2, LOW);
+        
+    } else {
+        digitalWrite(RelayPin, HIGH); //motor dea tivate
+        digitalWrite(relayPin2, HIGH);
+        
+    } 
+ }
